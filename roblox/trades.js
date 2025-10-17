@@ -2,18 +2,31 @@ const noblox = require('noblox.js');
 const embeds = require('../utils/embeds');
 const inventoryUtils = require('./inventory');
 
+// ✅ Replace this with your MM2 or game universe ID
+const UNIVERSE_ID = 66654135;
+// ✅ Set this in your .env or config
+const PRIVATE_SERVER_CODE = process.env.PRIVATE_SERVER_CODE;
+
 async function ensureInPrivateServer() {
     try {
-        const universeId = 142823291; // Example: MM2 universe ID – replace with yours
-        console.log('🟦 Attempting to join private server for monitoring...');
-        const join = await noblox.getGamePasses(universeId);
-        console.log('✅ Successfully accessed universe data (cookie valid)');
+        console.log('\n🟦 Attempting to join private server for monitoring...');
+        if (!PRIVATE_SERVER_CODE) {
+            console.warn('⚠️ PRIVATE_SERVER_CODE not found in environment!');
+            return false;
+        }
+
+        // Try to join your private server
+        const joinResponse = await noblox.joinPrivateServer(UNIVERSE_ID, PRIVATE_SERVER_CODE);
+
+        console.log('✅ Successfully joined private server!');
+        console.log('Response:', JSON.stringify(joinResponse, null, 2));
         return true;
     } catch (err) {
-        console.error('⚠️ Failed to verify access to private server / universe');
+        console.error('\n⚠️ Failed to join private server');
         console.error('Message:', err.message);
         console.error('Code:', err.statusCode || err.code);
-        console.error('Stack:', err.stack);
+        console.error('Stack:', err.stack || 'No stack trace');
+        console.error('Full error object:', JSON.stringify(err, null, 2));
         return false;
     }
 }
@@ -31,12 +44,13 @@ module.exports = {
         console.log('Trader 2 Roblox:', tradeData.trader2.roblox);
         console.log('=========================================================\n');
 
-        // Check if Roblox cookie actually works here
         console.log('🔍 Cookie length:', process.env.ROBLOSECURITY?.length);
         console.log('🔍 Cookie starts with:', process.env.ROBLOSECURITY?.slice(0, 10));
         console.log('🔍 Cookie ends with:', process.env.ROBLOSECURITY?.slice(-10));
 
-        await ensureInPrivateServer();
+        // ✅ Try to join the private server before checking trades
+        const joined = await ensureInPrivateServer();
+        if (!joined) console.warn('⚠️ Could not verify or join private server!');
 
         const checkInterval = setInterval(async () => {
             try {
@@ -58,8 +72,9 @@ module.exports = {
                     const receivedItems = t.offers?.map(o => o.name) || [];
                     const expectedItems = tradeData[traderSide].items;
 
-                    const itemsMatch = expectedItems.every(item => receivedItems.includes(item))
-                        && receivedItems.length === expectedItems.length;
+                    const itemsMatch =
+                        expectedItems.every(item => receivedItems.includes(item)) &&
+                        receivedItems.length === expectedItems.length;
 
                     if (itemsMatch && !tradeData[traderSide].itemsReceived) {
                         console.log(`✅ Trade ${tradeId}: Correct items from ${traderSide}, accepting trade...`);
@@ -72,12 +87,20 @@ module.exports = {
 
                         const channel = await client.channels.fetch(tradeData.channelId);
                         await channel.send({
-                            embeds: [embeds.tradeError(`The items sent by <@${tradeData[traderSide].discordId}> do not match their submitted items.`)]
+                            embeds: [
+                                embeds.tradeError(
+                                    `The items sent by <@${tradeData[traderSide].discordId}> do not match their submitted items.`
+                                ),
+                            ],
                         });
                     }
                 }
 
-                if (tradeData.trader1.itemsReceived && tradeData.trader2.itemsReceived && tradeData.status !== 'ready_to_confirm') {
+                if (
+                    tradeData.trader1.itemsReceived &&
+                    tradeData.trader2.itemsReceived &&
+                    tradeData.status !== 'ready_to_confirm'
+                ) {
                     tradeData.status = 'ready_to_confirm';
                     tradeStore.set(tradeId, tradeData);
 
@@ -94,7 +117,7 @@ module.exports = {
                     await channel.send({
                         content: `<@${tradeData.trader1.discordId}> <@${tradeData.trader2.discordId}>`,
                         embeds: [embed],
-                        components: [row]
+                        components: [row],
                     });
 
                     console.log(`< Trade ${tradeId}: Both sides collected, awaiting confirmation >`);
@@ -104,7 +127,6 @@ module.exports = {
                     clearInterval(checkInterval);
                     console.log(`< Trade ${tradeId}: Monitoring stopped (status: ${tradeData.status}) >`);
                 }
-
             } catch (err) {
                 console.error('\n========== ROBLOX TRADE ERROR DEBUG ==========');
                 console.error('❌ Error monitoring trade!');
@@ -115,5 +137,5 @@ module.exports = {
                 console.error('=============================================\n');
             }
         }, 10000);
-    }
+    },
 };
