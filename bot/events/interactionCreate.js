@@ -1,15 +1,37 @@
 const tradeCommand = require('../commands/trade');
 
 module.exports = async (client, interaction) => {
-    if (interaction.isModalSubmit()) {
-        await tradeCommand.handleModal(interaction);
-    }
+    try {
+        // Handle modal submissions (user submits trade info)
+        if (interaction.isModalSubmit()) {
+            await tradeCommand.handleModal(interaction);
+            return;
+        }
 
-    if (interaction.isButton()) {
-        await tradeCommand.handleButton(interaction);
-    }
+        // Handle button interactions (create trade, confirm, cancel, etc.)
+        if (interaction.isButton()) {
+            // We check all three possible actions cleanly
+            await tradeCommand.handleButton(interaction);
+            await tradeCommand.handleConfirm(interaction);
+            return;
+        }
 
-    if (interaction.isStringSelectMenu()) {
-        // Add select menu handling if needed
+        // Handle select menus (if you add them later)
+        if (interaction.isStringSelectMenu()) {
+            // Add menu logic here if needed
+            return;
+        }
+
+    } catch (err) {
+        console.error('⚠️ Interaction handler error:', err);
+        try {
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: '⚠️ Something went wrong.', ephemeral: true });
+            } else {
+                await interaction.reply({ content: '⚠️ Something went wrong.', ephemeral: true });
+            }
+        } catch (e) {
+            console.error('Failed to send error reply:', e);
+        }
     }
 };
