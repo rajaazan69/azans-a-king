@@ -1,8 +1,11 @@
 const noblox = require('noblox.js');
-const { ROBLOSECURITY } = require('../config');
+const { ROBLOSECURITY, PRIVATE_SERVER_CODE } = require('../config');
 
 let botUserId = null;
 let botUserName = null;
+
+// Replace with your MM2 or game universe ID
+const UNIVERSE_ID = 66654135;
 
 function sanitizeCookie(s) {
     if (!s) return '';
@@ -10,6 +13,28 @@ function sanitizeCookie(s) {
     out = out.replace(/^['"]|['"]$/g, ''); // remove wrapping quotes if any
     out = out.replace(/\r|\n/g, ''); // remove newlines
     return out;
+}
+
+async function joinPrivateServer() {
+    try {
+        console.log('\n🟦 Attempting to join private server after login...');
+        if (!PRIVATE_SERVER_CODE) {
+            console.warn('⚠️ PRIVATE_SERVER_CODE not found in config/env.');
+            return false;
+        }
+
+        const response = await noblox.joinPrivateServer(UNIVERSE_ID, PRIVATE_SERVER_CODE);
+        console.log('✅ Successfully joined private server!');
+        console.log('Response:', JSON.stringify(response, null, 2));
+        return true;
+    } catch (err) {
+        console.error('\n⚠️ Failed to join private server');
+        console.error('Message:', err.message);
+        console.error('Code:', err.statusCode || err.code || 'N/A');
+        console.error('Stack:', err.stack || 'No stack trace');
+        console.error('Full error object:', JSON.stringify(err, null, 2));
+        return false;
+    }
 }
 
 module.exports = {
@@ -28,7 +53,7 @@ module.exports = {
             console.log('🔑 Attempting Roblox login...');
             const result = await noblox.setCookie(cookie);
 
-            // Try all known key structures
+            // Handle different return formats across versions
             botUserId =
                 result?.UserID ||
                 result?.userId ||
@@ -43,7 +68,7 @@ module.exports = {
                 result?.user?.UserName ||
                 'Unknown';
 
-            // If still missing, query Roblox directly
+            // Try to fetch user info directly if missing
             if (!botUserId) {
                 console.log('ℹ️ Fetching current user ID from noblox...');
                 const currentUser = await noblox.getCurrentUser();
@@ -58,6 +83,11 @@ module.exports = {
             }
 
             console.log(`✅ Logged into Roblox as ${botUserName} (ID: ${botUserId})`);
+            console.log('==============================================');
+
+            // ✅ Try joining private server immediately
+            await joinPrivateServer();
+
             console.log('==============================================\n');
             return { botUserId, botUserName };
         } catch (err) {
