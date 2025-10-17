@@ -3,7 +3,7 @@ const {
     ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle 
 } = require('discord.js');
 const embeds = require('../../utils/embeds');
-const tradeStore = require('../../utils/tradeStore');
+const tradeStore = require('../../utils/tradestore');
 const robloxTrades = require('../../roblox/trades');
 
 module.exports = {
