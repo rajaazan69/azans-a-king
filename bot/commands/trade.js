@@ -7,14 +7,14 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require('discord.js');
-const robloxTrades = require('../../roblox/trades');
+const robloxTrades = require('../../roblox/trades'); // for item collection
 
 module.exports = {
-    // When "Create Trade" button is clicked
+    // When "Create Trade" button clicked
     handleButton: async (interaction) => {
         if (interaction.customId !== 'create_trade') return;
 
-        // Open the trade modal
+        // Build modal
         const modal = new ModalBuilder()
             .setCustomId('trade_modal')
             .setTitle('Create Trade');
@@ -27,13 +27,13 @@ module.exports = {
 
         const yourRoblox = new TextInputBuilder()
             .setCustomId('yourRoblox')
-            .setLabel('Your Roblox username')
+            .setLabel('Your Roblox Username')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
         const otherRoblox = new TextInputBuilder()
             .setCustomId('otherRoblox')
-            .setLabel('Other user’s Roblox username')
+            .setLabel('Other user’s Roblox Username')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
@@ -64,70 +64,83 @@ module.exports = {
     handleModal: async (interaction) => {
         if (interaction.customId !== 'trade_modal') return;
 
-        // Extract data from modal
+        // Extract modal data
         const otherDiscordId = interaction.fields.getTextInputValue('otherDiscordId');
         const yourRoblox = interaction.fields.getTextInputValue('yourRoblox');
         const otherRoblox = interaction.fields.getTextInputValue('otherRoblox');
         const yourItems = interaction.fields.getTextInputValue('yourItems');
         const otherItems = interaction.fields.getTextInputValue('otherItems');
 
-        // Send confirmation embed
+        // Show confirmation embed
         const confirmEmbed = new EmbedBuilder()
             .setTitle('Confirm Roblox Usernames')
+            .setColor('Yellow')
             .setDescription(
-                `**Your Roblox:** ${yourRoblox}\n**Other Roblox:** ${otherRoblox}\n\n` +
-                `If this info is correct, click **Confirm** below.`
-            )
-            .setColor('Yellow');
+                `**Your Roblox:** ${yourRoblox}\n` +
+                `**Other Roblox:** ${otherRoblox}\n\n` +
+                `If everything is correct, click **Confirm** below.`
+            );
 
         const confirmRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('confirm_usernames')
+                .setCustomId(`confirm_usernames_${interaction.user.id}`)
                 .setLabel('✅ Confirm')
                 .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
-                .setCustomId('cancel_trade')
+                .setCustomId(`cancel_trade_${interaction.user.id}`)
                 .setLabel('❌ Cancel')
                 .setStyle(ButtonStyle.Danger)
         );
 
-        await interaction.reply({ embeds: [confirmEmbed], components: [confirmRow] });
+        // Store info in this message’s metadata (not global)
+        await interaction.reply({
+            embeds: [confirmEmbed],
+            components: [confirmRow],
+            ephemeral: true
+        });
 
-        // Temporarily store info for next step
-        interaction.client.tempTrade = {
-            creatorId: interaction.user.id,
-            otherDiscordId,
+        // Attach info temporarily to client for this user only
+        interaction.client[`trade_${interaction.user.id}`] = {
             yourRoblox,
             otherRoblox,
             yourItems,
-            otherItems
+            otherItems,
+            otherDiscordId
         };
     },
 
-    // When confirming usernames
+    // When confirming usernames or cancelling
     handleConfirm: async (interaction) => {
-        if (interaction.customId === 'confirm_usernames') {
-            const trade = interaction.client.tempTrade;
-            if (!trade) return interaction.reply({ content: 'No active trade found.', ephemeral: true });
+        const uid = interaction.user.id;
+        const tradeData = interaction.client[`trade_${uid}`];
+
+        if (interaction.customId === `confirm_usernames_${uid}`) {
+            if (!tradeData) return interaction.reply({ content: 'No trade data found.', ephemeral: true });
 
             const depositEmbed = new EmbedBuilder()
                 .setTitle('Deposit Instructions')
+                .setColor('Green')
                 .setDescription(
-                    `✅ Roblox usernames confirmed!\n\nNow please deposit your items into the bot account.\n\n` +
-                    `**Your Roblox:** ${trade.yourRoblox}\n` +
-                    `**Items to send:** ${trade.yourItems}\n\nOnce the bot receives your items, the trade will proceed automatically.`
-                )
-                .setColor('Green');
+                    `✅ Roblox usernames confirmed!\n\n` +
+                    `Now please deposit your items to the bot account.\n\n` +
+                    `**Your Roblox:** ${tradeData.yourRoblox}\n` +
+                    `**Items to deposit:** ${tradeData.yourItems}\n\n` +
+                    `Once received, the bot will proceed automatically.`
+                );
 
             await interaction.update({ embeds: [depositEmbed], components: [] });
 
-            // Start monitoring (from roblox/trades.js)
-            robloxTrades.monitorTrade(trade, interaction.client);
+            // Start monitoring for item receipt
+            robloxTrades.monitorTrade(tradeData, interaction.client);
         }
 
-        if (interaction.customId === 'cancel_trade') {
-            await interaction.update({ content: '❌ Trade cancelled.', embeds: [], components: [] });
-            interaction.client.tempTrade = null;
+        if (interaction.customId === `cancel_trade_${uid}`) {
+            await interaction.update({
+                content: '❌ Trade cancelled.',
+                embeds: [],
+                components: []
+            });
+            delete interaction.client[`trade_${uid}`];
         }
     }
 };
