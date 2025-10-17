@@ -1,4 +1,7 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { 
+    ModalBuilder, TextInputBuilder, TextInputStyle, 
+    ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle 
+} = require('discord.js');
 const embeds = require('../../utils/embeds');
 const tradeStore = require('../../utils/tradeStore');
 const robloxTrades = require('../../roblox/trades');
@@ -25,7 +28,21 @@ module.exports = {
         tradeStore.set(tradeId, tradeData);
 
         const embed = embeds.tradeCreated(tradeData);
-        await interaction.reply({ embeds: [embed] });
+
+        // ✅ Add trade-specific buttons
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`confirm_${tradeId}`)
+                    .setLabel('✅ Confirm Trade')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId(`cancel_${tradeId}`)
+                    .setLabel('❌ Cancel Trade')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+        await interaction.reply({ embeds: [embed], components: [row] });
 
         // Start monitoring for collection
         robloxTrades.monitorTrade(tradeData, tradeStore, interaction.client);
@@ -37,9 +54,14 @@ module.exports = {
         if (!trade) return interaction.reply({ content: 'Trade not found!', ephemeral: true });
 
         if (interaction.customId.startsWith('confirm')) {
-            // Confirmation logic here
-        } else if (interaction.customId.startsWith('cancel')) {
-            // Cancellation logic here
+            await interaction.reply({ content: '✅ Trade confirmed!', ephemeral: true });
+            trade.status = 'confirmed';
+            tradeStore.set(tradeId, trade);
+        } 
+        else if (interaction.customId.startsWith('cancel')) {
+            await interaction.reply({ content: '❌ Trade cancelled.', ephemeral: true });
+            trade.status = 'cancelled';
+            tradeStore.delete(tradeId);
         }
     }
 };
