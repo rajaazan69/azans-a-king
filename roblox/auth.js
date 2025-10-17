@@ -26,11 +26,32 @@ module.exports = {
 
         try {
             console.log('🔑 Attempting Roblox login...');
-            const user = await noblox.setCookie(cookie);
+            const result = await noblox.setCookie(cookie);
 
-            // noblox 6.x returns { userId, name }
-            botUserId = user?.userId || user?.UserID || null;
-            botUserName = user?.name || user?.UserName || 'Unknown';
+            // Try all known key structures
+            botUserId =
+                result?.UserID ||
+                result?.userId ||
+                result?.user?.id ||
+                result?.user?.UserID ||
+                null;
+
+            botUserName =
+                result?.UserName ||
+                result?.name ||
+                result?.user?.name ||
+                result?.user?.UserName ||
+                'Unknown';
+
+            // If still missing, query Roblox directly
+            if (!botUserId) {
+                console.log('ℹ️ Fetching current user ID from noblox...');
+                const currentUser = await noblox.getCurrentUser();
+                if (currentUser && currentUser.UserID) {
+                    botUserId = currentUser.UserID;
+                    botUserName = currentUser.UserName;
+                }
+            }
 
             if (!botUserId) {
                 throw new Error('Login succeeded but userId not found.');
@@ -38,8 +59,7 @@ module.exports = {
 
             console.log(`✅ Logged into Roblox as ${botUserName} (ID: ${botUserId})`);
             console.log('==============================================\n');
-
-            return user;
+            return { botUserId, botUserName };
         } catch (err) {
             console.error('❌ Roblox login failed.');
             console.error('Reason:', err.message || err);
