@@ -1,0 +1,14 @@
+{
+  "name": "mm2-escrow-bot",
+  "version": "1.0.0",
+  "description": "MM2 Middleman Escrow Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^15.9.0",
+    "noblox.js": "^4.0.0",
+    "dotenv": "^16.0.0"
+  }
+}
