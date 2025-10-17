@@ -1,6 +1,6 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const embeds = require('../../utils/embeds');
-const tradeStore = new Map();
+const tradeStore = require('../../utils/tradeStore');
 const robloxTrades = require('../../roblox/trades');
 
 module.exports = {
